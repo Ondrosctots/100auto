@@ -74,7 +74,7 @@ class ReverbListingCloner:
 # --- UI Setup ---
 st.set_page_config(page_title="Reverb Cloner", layout="wide")
 
-st.title("🎸 Reverb Bulk Cloner")
+st.title("🎸")
 
 # Step 1: Manual Input Form (Always asks for these)
 with st.container():
@@ -82,16 +82,16 @@ with st.container():
     col_a, col_b = st.columns(2)
     
     with col_a:
-        api_token = st.text_input("Enter Reverb API Token", type="password", help="Your personal Reverb API Bearer token")
-        ship_id = st.text_input("Enter Shipping Profile ID", placeholder="e.g. 123456")
+        api_token = st.text_input("🔑", type="password", help="🔑")
+        ship_id = st.text_input("ID", placeholder="e.g. 123456")
     
     with col_b:
-        url_input = st.text_area("Enter Source URLs", placeholder="URL 1, URL 2, URL 3...", help="Comma-separated or one per line")
+        url_input = st.text_area("URL", placeholder="URL 1, URL 2, URL 3...", help=",")
 
 # Step 2: Processing Logic
-if st.button("🚀 Process & Create Drafts"):
+if st.button("🚀"):
     if not api_token or not ship_id or not url_input:
-        st.warning("Please fill in the Token, Shipping ID, and at least one URL.")
+        st.warning("F.")
     else:
         app = ReverbListingCloner(api_token)
         urls = [u.strip() for u in url_input.replace("\n", ",").split(",") if u.strip()]
