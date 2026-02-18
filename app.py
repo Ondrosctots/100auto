@@ -68,30 +68,43 @@ class ReverbListingCloner:
         return requests.post(f"{self.base_url}/listings", headers=self.headers, json=payload)
 
     def publish_listing(self, listing_id):
+        """Triggers the transition to live state."""
         url = f"{self.base_url}/listings/{listing_id}"
-        return requests.put(url, headers=self.headers, json={"publish": True})
+        payload = {"publish": True}
+        response = requests.put(url, headers=self.headers, json=payload)
+        
+        # FIX: Reverb often returns 200/202 but the 'state' remains 'draft' for a few seconds.
+        # We check the HTTP status code instead of the body's 'state' field.
+        if 200 <= response.status_code < 300:
+            return True, "Success"
+        else:
+            try:
+                msg = response.json().get("message", "API Error")
+            except:
+                msg = f"Status {response.status_code}"
+            return False, msg
 
 # --- UI Setup ---
-st.set_page_config(page_title="Reverb Cloner", layout="wide")
+st.set_page_config(page_title="Reverb Cloner", page_icon="🎸", layout="wide")
 
 st.title("🎸")
 
-# Step 1: Manual Input Form (Always asks for these)
+# Always ask for inputs
 with st.container():
     st.subheader("📋 Step 1: Setup & Source")
     col_a, col_b = st.columns(2)
     
     with col_a:
-        api_token = st.text_input("🔑", type="password", help="🔑")
+        api_token = st.text_input("code", type="password")
         ship_id = st.text_input("ID", placeholder="e.g. 123456")
     
     with col_b:
-        url_input = st.text_area("URL", placeholder="URL 1, URL 2, URL 3...", help=",")
+        url_input = st.text_area("URL", placeholder=",...")
 
 # Step 2: Processing Logic
 if st.button("🚀"):
     if not api_token or not ship_id or not url_input:
-        st.warning("F.")
+        st.warning("Please fill in all fields.")
     else:
         app = ReverbListingCloner(api_token)
         urls = [u.strip() for u in url_input.replace("\n", ",").split(",") if u.strip()]
@@ -109,31 +122,32 @@ if st.button("🚀"):
                     if res.status_code in [200, 201, 202]:
                         new_id = res.json().get("id") or res.json().get("listing", {}).get("id")
                         drafts_created.append(new_id)
-                        st.success(f"Draft Created: {new_id} (from {url})")
+                        st.success(f"Draft Created: {new_id}")
             
             progress.progress((idx + 1) / len(urls))
             time.sleep(1)
 
         if drafts_created:
             st.session_state['last_drafts'] = drafts_created
-            st.info(f"Generated {len(drafts_created)} drafts. You can now publish them below.")
+            st.info(f"Generated {len(drafts_created)} drafts. Ready to publish.")
 
 # Step 3: Final Publish
 if 'last_drafts' in st.session_state and st.session_state['last_drafts']:
     st.divider()
-    st.subheader("📢 Step 2: Publish to Live")
+    st.subheader("📢 Step 2: Live")
     
-    if st.button("✅ YES, Publish All to LIVE"):
+    if st.button("✅ YES, GO"):
         app = ReverbListingCloner(api_token)
-        st.write("Waiting 10s for image processing...")
-        time.sleep(10)
+        
+        with st.spinner("Waiting 10s for images to process..."):
+            time.sleep(10)
         
         for d_id in st.session_state['last_drafts']:
-            pub_res = app.publish_listing(d_id)
-            if pub_res.status_code == 200:
-                st.success(f"Listing {d_id} is now LIVE!")
+            success, message = app.publish_listing(d_id)
+            if success:
+                st.success(f"✅ Listing {d_id} update sent! It will appear live in a moment.")
             else:
-                st.error(f"Failed to publish {d_id}")
+                st.error(f"❌ Failed to publish {d_id}: {message}")
         
-        # Clear state so you don't accidentally double-publish
+        # Reset state after finish
         st.session_state['last_drafts'] = []
